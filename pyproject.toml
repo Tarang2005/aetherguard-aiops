@@ -1,0 +1,38 @@
+[project]
+name = "aetherguard-aiops"
+version = "0.1.0"
+description = "Agentic Multi-Cloud AIOps with Cost-Aware Self-Healing & Chaos Resilience"
+authors = [{ name = "Tarang" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",      # Change to langchain-groq or langchain-anthropic if you prefer
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "scikit-learn>=1.5.0",
+    "pandas>=2.2.0",
+    "numpy>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
+    "rich>=13.0.0",
+    "websockets>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.23.0",
+    "black>=24.0.0",
+]
+
+[tool.uv]
+dev-dependencies = ["aetherguard-aiops[dev]"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
