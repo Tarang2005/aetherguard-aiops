@@ -1,0 +1,31 @@
+name: pod_crash
+description: >
+  Simulates a Kubernetes pod crash loop on the ml-worker service.
+  Memory spikes before OOMKill, then drops to zero while the pod
+  restarts. Network drops and error rate surges during the window.
+
+targets:
+  services: [ml-worker]
+
+overrides:
+  memory_usage:
+    mean: 97.0
+    std: 1.5
+  error_rate:
+    mean: 18.0
+    std: 3.0
+  request_latency:
+    mean: 3500.0
+    std: 400.0
+  network_out:
+    mean: 5.0
+    std: 2.0
+
+duration_seconds: 120
+ramp_up_seconds: 5
+
+metadata:
+  severity: critical
+  category: availability
+  expected_detection_seconds: 15
+  remediation_hint: "Check OOMKill events — increase memory limits or fix memory leak"

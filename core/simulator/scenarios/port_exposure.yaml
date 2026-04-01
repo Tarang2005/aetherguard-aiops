@@ -1,0 +1,34 @@
+name: port_exposure
+description: >
+  Simulates a misconfigured security group exposing sensitive ports
+  (22, 3306, 6379) to 0.0.0.0/0. Accompanied by unusual outbound
+  network traffic and elevated error rates suggesting active probing
+  or data exfiltration attempt.
+
+targets:
+  services: [db-replica]
+
+overrides:
+  network_out:
+    mean: 950.0
+    std: 120.0
+  network_in:
+    mean: 520.0
+    std: 80.0
+  error_rate:
+    mean: 7.5
+    std: 1.5
+  disk_io_read:
+    mean: 380.0
+    std: 40.0
+
+duration_seconds: 300
+ramp_up_seconds: 0
+
+metadata:
+  severity: critical
+  category: security
+  expected_detection_seconds: 10
+  remediation_hint: "Auto-revoke SG rule — trigger zero-trust firewall Lambda — alert SecOps"
+  exposed_ports: [22, 3306, 6379]
+  compliance_flags: [PCI-DSS-1.2, SOC2-CC6.6]

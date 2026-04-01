@@ -1,0 +1,28 @@
+name: cpu_spike
+description: >
+  Sudden CPU saturation on api-server instances.
+  Simulates a runaway process or traffic surge causing
+  CPU to spike above 90%, degrading request latency.
+
+targets:
+  services: [api-server]
+
+overrides:
+  cpu_utilization:
+    mean: 93.0
+    std: 2.5
+  request_latency:
+    mean: 870.0
+    std: 60.0
+  error_rate:
+    mean: 4.5
+    std: 0.8
+
+duration_seconds: 180
+ramp_up_seconds: 15
+
+metadata:
+  severity: high
+  category: performance
+  expected_detection_seconds: 30
+  remediation_hint: "Scale out api-server ASG or kill runaway PID"

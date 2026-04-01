@@ -1,0 +1,32 @@
+name: latency_flood
+description: >
+  Simulates a network latency flood — either a DDoS-style inbound
+  traffic surge or a noisy-neighbour situation on shared networking.
+  Network in spikes massively, latency becomes unacceptable,
+  but CPU and memory remain relatively normal (pure network issue).
+
+targets:
+  all: true
+
+overrides:
+  network_in:
+    mean: 4200.0
+    std: 300.0
+  network_out:
+    mean: 1800.0
+    std: 200.0
+  request_latency:
+    mean: 2800.0
+    std: 350.0
+  error_rate:
+    mean: 12.0
+    std: 2.5
+
+duration_seconds: 240
+ramp_up_seconds: 20
+
+metadata:
+  severity: high
+  category: network
+  expected_detection_seconds: 20
+  remediation_hint: "Enable AWS Shield / WAF rate limiting — check VPC flow logs"
