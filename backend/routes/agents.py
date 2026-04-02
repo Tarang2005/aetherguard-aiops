@@ -6,17 +6,14 @@ Agent endpoints — trigger incident runs, get agent status.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 
+from agents.state import AetherGuardState, new_incident
 from agents.supervisor import SupervisorAgent
-from backend.dependencies import (
-    get_supervisor,
-    store_incident,
-)
+from backend.dependencies import get_supervisor, store_incident
 
 router = APIRouter()
 
@@ -40,9 +37,14 @@ async def run_incident(
     supervisor: SupervisorAgent = Depends(get_supervisor),
 ):
     """
-    Trigger a full incident detection → RCA → remediation → chaos cycle.
-    Runs in the background so the API returns immediately.
+    Trigger a full incident pipeline.
+    Returns immediately — pipeline runs in the background.
+    Check the Incidents page after 30-60s for results.
     """
+    # Create placeholder incident and return immediately
+    placeholder = new_incident(active_scenario=request.scenario)
+    store_incident(placeholder)
+    incident_id = placeholder.incident_id
 
     def _run():
         result = supervisor.run_incident(
@@ -50,16 +52,19 @@ async def run_incident(
             auto_remediate=request.auto_remediate,
             run_chaos=request.run_chaos,
         )
+        # LangGraph returns a dict — convert back to AetherGuardState
+        if isinstance(result, dict):
+            result = AetherGuardState(**result)
+        # Keep the same incident_id so dashboard can find it
+        result.incident_id = incident_id
         store_incident(result)
-        return result
 
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, _run)
+    background_tasks.add_task(_run)
 
     return RunIncidentResponse(
-        incident_id=result.incident_id,
-        status=result.status.value,
-        message=f"Incident {result.incident_id} completed with status: {result.status.value}",
+        incident_id=incident_id,
+        status="investigating",
+        message=f"Incident {incident_id} started — check Incidents page in ~30s.",
     )
 
 
@@ -82,10 +87,9 @@ async def list_scenarios():
 @router.get("/status")
 async def agent_status(supervisor: SupervisorAgent = Depends(get_supervisor)):
     """Return current agent system status."""
-    detector_stats = supervisor.anomaly_agent.detector.stats()
     return {
         "status": "ready",
-        "detector": detector_stats,
+        "detector": supervisor.anomaly_agent.detector.stats(),
         "auto_remediate": supervisor.auto_remediate,
         "run_chaos": supervisor.run_chaos,
     }

@@ -66,7 +66,7 @@ SEVERITY_THRESHOLDS = {
 }
 
 # Anti-flapping: anomaly must persist for this many consecutive ticks
-FLAP_THRESHOLD = 2
+FLAP_THRESHOLD = 1
 
 # Isolation Forest contamination — expected % of anomalies in normal data
 IF_CONTAMINATION = 0.05

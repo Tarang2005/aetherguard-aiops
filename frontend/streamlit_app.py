@@ -46,9 +46,12 @@ def api_get(path: str) -> dict | None:
 
 def api_post(path: str, payload: dict = {}) -> dict | None:
     try:
-        r = requests.post(f"{API_BASE}{path}", json=payload, timeout=30)
+        r = requests.post(f"{API_BASE}{path}", json=payload, timeout=120)
         r.raise_for_status()
         return r.json()
+    except requests.exceptions.Timeout:
+        # Pipeline is running in background — not a real error
+        return {"incident_id": "pending", "status": "investigating", "message": "Pipeline running in background — check Incidents page in ~30s"}
     except Exception as e:
         st.error(f"API error: {e}")
         return None
@@ -95,7 +98,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigation",
-        ["📊 Overview", "🚨 Incidents", "💥 Chaos Lab", "💰 Cost", "🤖 Agents"],
+        ["Overview", "Incidents", "Chaos Lab", "Cost", "Agents"],
         label_visibility="collapsed",
     )
 
@@ -110,7 +113,7 @@ with st.sidebar:
     auto_remediate = st.toggle("Auto-remediate", value=False)
     run_chaos      = st.toggle("Run chaos after", value=True)
 
-    if st.button("🚀 Run Incident", use_container_width=True, type="primary"):
+    if st.button("Run Incident", use_container_width=True, type="primary"):
         with st.spinner("Running incident pipeline..."):
             result = api_post("/agents/run", {
                 "scenario":       scenario,
@@ -118,7 +121,7 @@ with st.sidebar:
                 "run_chaos":      run_chaos,
             })
             if result:
-                st.success(f"✅ {result['incident_id']} — {result['status']}")
+                st.success(f"{result['incident_id']} — {result['status']}")
                 st.rerun()
 
     st.markdown("---")
@@ -128,8 +131,8 @@ with st.sidebar:
 
 # ── Page: Overview ────────────────────────────────────────────────────────────
 
-if page == "📊 Overview":
-    st.title("🛡️ AetherGuard — Live Overview")
+if page == "Overview":
+    st.title("AetherGuard — Live Overview")
 
     # Top KPI row
     incidents_data = api_get("/dashboard/incidents")
@@ -166,7 +169,7 @@ if page == "📊 Overview":
     col_aws, col_net = st.columns(2)
 
     with col_aws:
-        st.subheader("☁️ AWS Metrics")
+        st.subheader("AWS Metrics")
         if aws_data and aws_data.get("metrics"):
             df = pd.DataFrame(aws_data["metrics"])
             pivot = df.pivot_table(
@@ -180,7 +183,7 @@ if page == "📊 Overview":
                 st.bar_chart(cpu_df.set_index("instance_id"), color="#FF6B6B")
 
     with col_net:
-        st.subheader("🌐 Network Health")
+        st.subheader("Network Health")
         if net_data and net_data.get("metrics"):
             df = pd.DataFrame(net_data["metrics"])
             hs = df[["device_id", "device_type", "site", "health_score", "health_label"]]
@@ -191,7 +194,7 @@ if page == "📊 Overview":
 
     # Recent incidents table
     st.markdown("---")
-    st.subheader("🚨 Recent Incidents")
+    st.subheader("Recent Incidents")
     if incidents:
         rows = []
         for i in incidents[-10:][::-1]:
@@ -211,8 +214,8 @@ if page == "📊 Overview":
 
 # ── Page: Incidents ───────────────────────────────────────────────────────────
 
-elif page == "🚨 Incidents":
-    st.title("🚨 Incident Management")
+elif page == "Incidents":
+    st.title("Incident Management")
 
     incidents_data = api_get("/dashboard/incidents")
     incidents = incidents_data.get("incidents", []) if incidents_data else []
@@ -237,10 +240,10 @@ elif page == "🚨 Incidents":
             c3.markdown(f"**Anomalies:** {summary['anomaly_count']}")
 
             if summary.get("title"):
-                st.info(f"📋 {summary['title']}")
+                st.info(f"{summary['title']}")
 
             tab1, tab2, tab3, tab4, tab5 = st.tabs(
-                ["🔍 Anomalies", "🧠 RCA", "🔧 Remediation", "💬 Agent Log", "📋 Audit"]
+                ["Anomalies", "RCA", "Remediation", "Agent Log", "Audit"]
             )
 
             with tab1:
@@ -285,13 +288,13 @@ elif page == "🚨 Incidents":
                     if approval and approval.get("has_gate"):
                         decision = approval.get("decision")
                         if decision is None:
-                            st.warning("⏳ Awaiting human approval")
+                            st.warning("Awaiting human approval")
                             bc1, bc2 = st.columns(2)
-                            if bc1.button("✅ Approve", type="primary", use_container_width=True):
+                            if bc1.button("Approve", type="primary", use_container_width=True):
                                 api_post(f"/approval/{selected_id}/approve", {"decided_by": "dashboard_user"})
                                 st.success("Approved!")
                                 st.rerun()
-                            if bc2.button("❌ Deny", use_container_width=True):
+                            if bc2.button("Deny", use_container_width=True):
                                 api_post(f"/approval/{selected_id}/deny", {"decided_by": "dashboard_user"})
                                 st.error("Denied.")
                                 st.rerun()
@@ -325,8 +328,8 @@ elif page == "🚨 Incidents":
 
 # ── Page: Chaos Lab ───────────────────────────────────────────────────────────
 
-elif page == "💥 Chaos Lab":
-    st.title("💥 Chaos Resilience Lab")
+elif page == "Chaos Lab":
+    st.title("Chaos Resilience Lab")
 
     resilience_data = api_get("/dashboard/resilience")
     experiments = resilience_data.get("experiments", []) if resilience_data else []
@@ -366,12 +369,12 @@ elif page == "💥 Chaos Lab":
 
     # Manual injection
     st.markdown("---")
-    st.subheader("🧪 Inject Scenario")
+    st.subheader("Inject Scenario")
     col1, col2 = st.columns(2)
     inject_scenario = col1.selectbox(
         "Scenario", ["cpu_spike", "pod_crash", "latency_flood", "port_exposure"]
     )
-    if col2.button("💉 Inject Now", type="primary", use_container_width=True):
+    if col2.button("Inject Now", type="primary", use_container_width=True):
         with st.spinner(f"Injecting {inject_scenario}..."):
             result = api_post("/chaos/inject", {
                 "scenario": inject_scenario,
@@ -380,7 +383,7 @@ elif page == "💥 Chaos Lab":
             if result and result.get("chaos_summary"):
                 cs = result["chaos_summary"]
                 st.success(
-                    f"✅ Resilience score: **{cs['resilience_score']}/100** | "
+                    f"Resilience score: **{cs['resilience_score']}/100** | "
                     f"Detection: {cs['detection_time']}s | "
                     f"Recovery: {cs['recovery_time']}s"
                 )
@@ -389,8 +392,8 @@ elif page == "💥 Chaos Lab":
 
 # ── Page: Cost ────────────────────────────────────────────────────────────────
 
-elif page == "💰 Cost":
-    st.title("💰 Cost Optimization")
+elif page == "Cost":
+    st.title("Cost Optimization")
 
     cost_data = api_get("/dashboard/cost")
 
@@ -420,8 +423,8 @@ elif page == "💰 Cost":
 
 # ── Page: Agents ──────────────────────────────────────────────────────────────
 
-elif page == "🤖 Agents":
-    st.title("🤖 Agent System Status")
+elif page == "Agents":
+    st.title("Agent System Status")
 
     status = api_get("/agents/status")
     scenarios = api_get("/agents/scenarios")
@@ -433,14 +436,14 @@ elif page == "🤖 Agents":
         c3.metric("Chaos enabled", "ON" if status.get("run_chaos") else "OFF")
 
         st.markdown("---")
-        st.subheader("🔬 Anomaly Detector")
+        st.subheader("Anomaly Detector")
         detector = status.get("detector", {})
         dc1, dc2 = st.columns(2)
         dc1.metric("Tracked entity-metrics", detector.get("tracked_entities", 0))
         dc2.metric("Fitted models",          detector.get("fitted_models", 0))
 
     st.markdown("---")
-    st.subheader("📋 Agent Pipeline")
+    st.subheader("Agent Pipeline")
 
     agents_info = [
         {"Agent": "Supervisor",           "Role": "Orchestrates the full pipeline, manages approval gates"},
@@ -453,7 +456,7 @@ elif page == "🤖 Agents":
 
     if scenarios:
         st.markdown("---")
-        st.subheader("🎭 Available Scenarios")
+        st.subheader("Available Scenarios")
         st.dataframe(pd.DataFrame(scenarios["scenarios"]), use_container_width=True, hide_index=True)
 
 

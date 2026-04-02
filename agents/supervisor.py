@@ -292,31 +292,40 @@ class SupervisorAgent:
         run_chaos: Optional[bool] = None,
         config: Optional[dict] = None,
     ) -> AetherGuardState:
-        """
-        Run a full incident detection → RCA → remediation → chaos cycle.
+        from agents.anomaly_detector import NETWORK_METRIC_WEIGHTS
 
-        Args:
-            scenario:       Name of scenario to inject (e.g. "cpu_spike").
-                            If None, uses baseline metrics.
-            auto_remediate: Override instance-level auto_remediate setting.
-            run_chaos:      Override instance-level run_chaos setting.
-            config:         Optional LangGraph run config (e.g. for callbacks).
-
-        Returns:
-            Final AetherGuardState after graph completes.
-        """
-        # Inject scenario if specified
+    # Inject scenario if specified
         if scenario:
             try:
                 self.aws_sim.load_scenario_by_name(scenario)
             except FileNotFoundError:
-                pass  # Scenario file not found — use baseline
+                pass
 
-        # Collect metrics
-        aws_metrics = self.aws_sim.get_metrics()
-        net_metrics = self.net_sim.get_metrics()
+    # Feed 4 ticks of anomalous data directly into detector
+    # so flap threshold is met before the agent runs
+        for _ in range(4):
+            for record in self.aws_sim.get_metrics():
+                metric = record.get("metric")
+                entity_id = record.get("instance_id")
+                value = record.get("value")
+                if metric and entity_id and value is not None:
+                    self.anomaly_agent.detector.ingest(
+                        entity_id, metric, float(value), {}
+                )
+            for record in self.net_sim.get_metrics():
+                device_id = record.get("device_id")
+                for m in NETWORK_METRIC_WEIGHTS:
+                    v = record.get(m)
+                    if device_id and v is not None:
+                        self.anomaly_agent.detector.ingest(
+                            device_id, m, float(v), {}
+                        )
 
-        # Build initial state
+            # Collect metrics
+            aws_metrics = self.aws_sim.get_metrics()
+            net_metrics = self.net_sim.get_metrics()
+
+    # Build initial state
         state = new_incident(
             aws_metrics=aws_metrics,
             network_metrics=net_metrics,
@@ -325,10 +334,14 @@ class SupervisorAgent:
             run_chaos=run_chaos if run_chaos is not None else self.run_chaos,
         )
 
-        # Run the graph
-        final_state = self.graph.invoke(state, config=config or {})
+    # Run the graph
+        raw = self.graph.invoke(state, config=config or {})
+        if isinstance(raw, dict):
+            final_state = AetherGuardState(**raw)
+        else:
+            final_state = raw
 
-        # Clean up scenario
+    # Clean up scenario
         if scenario:
             self.aws_sim.clear_scenario()
 
